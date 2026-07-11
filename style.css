@@ -2175,8 +2175,25 @@ body.cursor-hover .cursor-ring {
     text-align: center;
   }
 
+  .hero .row {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero .col-lg-7,
+  .hero .col-lg-5 {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
   .hero-name {
     font-size: 2.2rem;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
   }
 
   .hero-role {
