@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://santhosh-mern-dev.github.io/santhosh-portfolio/sitemap.xml
+
+
+
