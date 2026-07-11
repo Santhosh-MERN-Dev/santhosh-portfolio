@@ -120,10 +120,12 @@ img {
   display: block;
 }
 
+/* OPT: contain:layout reduces scope of layout recalculations per section */
 section {
   padding: 100px 0;
   position: relative;
   z-index: 2;
+  contain: layout style;
 }
 
 /* ============================================================
@@ -609,13 +611,14 @@ body.cursor-hover .cursor-ring {
   background-clip: text;
 }
 
+/* OPT: specific transitions instead of all to avoid triggering unintended property animations */
 .nav-link {
   font-weight: 500;
   font-size: 0.95rem;
   color: var(--text-secondary) !important;
   padding: 8px 16px !important;
   border-radius: 8px;
-  transition: all 0.3s ease;
+  transition: color 0.3s ease, background 0.3s ease;
   position: relative;
 }
 
@@ -641,7 +644,7 @@ body.cursor-hover .cursor-ring {
   transform: translateX(-50%) scaleX(1);
 }
 
-/* Theme Toggle Button */
+/* Theme Toggle Button - OPT: specific transitions for GPU-compositable properties */
 .theme-toggle-btn {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -655,9 +658,10 @@ body.cursor-hover .cursor-ring {
   cursor: pointer;
   color: var(--text-primary);
   font-size: 1.1rem;
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
   padding: 0;
   flex-shrink: 0;
+  will-change: transform;
 }
 
 .theme-toggle-btn:hover {
@@ -852,6 +856,7 @@ body.cursor-hover .cursor-ring {
 .hero-name-accent {
   display: inline-block;
   transition: transform 0.3s ease, filter 0.3s ease;
+  will-change: transform;
 }
 
 .hero-name-text {
@@ -936,6 +941,7 @@ body.cursor-hover .cursor-ring {
   margin-bottom: 32px;
 }
 
+/* OPT: specific transitions instead of all; only animate transform, color, bg, border, shadow */
 .social-icon {
   width: 44px;
   height: 44px;
@@ -948,7 +954,8 @@ body.cursor-hover .cursor-ring {
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(10px);
   color: var(--text-secondary);
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), color 0.35s ease, background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+  will-change: transform;
 }
 
 .social-icon:hover {
@@ -978,6 +985,7 @@ body.cursor-hover .cursor-ring {
 }
 
 /* Hero Buttons */
+/* OPT: GPU-compositable transitions only */
 .btn-gradient {
   background: var(--accent-gradient);
   color: #fff;
@@ -986,13 +994,14 @@ body.cursor-hover .cursor-ring {
   border-radius: 12px;
   font-weight: 600;
   font-size: 0.95rem;
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
   box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
   display: inline-flex;
   align-items: center;
   gap: 8px;
   position: relative;
   overflow: hidden;
+  will-change: transform;
 }
 
 .btn-gradient::before {
@@ -1014,6 +1023,7 @@ body.cursor-hover .cursor-ring {
   opacity: 1;
 }
 
+/* OPT: specific transitions for GPU-compositable properties */
 .btn-outline-glass {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
@@ -1023,10 +1033,11 @@ body.cursor-hover .cursor-ring {
   border-radius: 12px;
   font-weight: 500;
   font-size: 0.95rem;
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  will-change: transform;
 }
 
 .btn-outline-glass:hover {
@@ -1198,7 +1209,7 @@ body.cursor-hover .cursor-ring {
 }
 
 .tilt-hover {
-  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
 }
 
@@ -1298,9 +1309,11 @@ body.cursor-hover .cursor-ring {
   border-radius: 20px;
   padding: 32px;
   box-shadow: var(--glass-shadow);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease;
   position: relative;
   overflow: hidden;
+  contain: layout style;
+  will-change: transform;
 }
 
 .quick-facts-card::before {
@@ -1370,10 +1383,13 @@ body.cursor-hover .cursor-ring {
 /* ============================================================
    Skills Section
    ============================================================ */
+/* OPT: content-visibility:auto skips rendering off-screen sections until near viewport */
 #skills {
   background: var(--bg-primary);
   position: relative;
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
 }
 
 #skills::before {
@@ -1430,17 +1446,20 @@ body.cursor-hover .cursor-ring {
   gap: 20px;
 }
 
+/* OPT: containment isolates layout/paint per card, reducing reflow scope */
 .skill-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   padding: 32px 16px 24px;
   text-align: center;
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, border-color 0.4s ease;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
   cursor: default;
+  contain: layout style;
+  will-change: transform;
 }
 
 .skill-card::before {
@@ -1496,7 +1515,7 @@ body.cursor-hover .cursor-ring {
   width: 48px;
   height: 48px;
   object-fit: contain;
-  transition: all 0.4s ease;
+  transition: transform 0.4s ease, filter 0.4s ease;
 }
 
 .skill-card-icon i {
@@ -1521,7 +1540,7 @@ body.cursor-hover .cursor-ring {
   color: var(--text-secondary);
   position: relative;
   z-index: 1;
-  transition: all 0.35s ease;
+  transition: color 0.35s ease, font-weight 0.35s ease;
   margin: 0;
 }
 
@@ -1537,6 +1556,8 @@ body.cursor-hover .cursor-ring {
   background: var(--bg-secondary);
   position: relative;
   overflow: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 700px;
 }
 
 #services::before {
@@ -1557,17 +1578,20 @@ body.cursor-hover .cursor-ring {
   margin: 0 auto;
 }
 
+/* OPT: containment and specific transitions */
 .service-card {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   padding: 40px 28px 36px;
   text-align: center;
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, border-color 0.4s ease;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
   cursor: default;
+  contain: layout style;
+  will-change: transform;
 }
 
 .service-card::before {
@@ -1602,9 +1626,10 @@ body.cursor-hover .cursor-ring {
   justify-content: center;
   font-size: 2rem;
   color: var(--accent-1);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
   position: relative;
   z-index: 1;
+  will-change: transform;
 }
 
 .service-card:hover .service-card-icon {
@@ -1655,6 +1680,8 @@ body.cursor-hover .cursor-ring {
    ============================================================ */
 #projects {
   background: var(--bg-secondary);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
 }
 
 .project-card {
@@ -1662,10 +1689,12 @@ body.cursor-hover .cursor-ring {
   border: 1px solid var(--card-border);
   border-radius: 20px;
   overflow: hidden;
-  transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.5s ease;
   box-shadow: var(--shadow-sm);
   height: 100%;
   cursor: default;
+  contain: layout style;
+  will-change: transform;
 }
 
 .project-card:hover {
@@ -1713,7 +1742,7 @@ body.cursor-hover .cursor-ring {
   border-radius: 10px;
   font-weight: 600;
   font-size: 0.85rem;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, background 0.3s ease;
 }
 
 .project-card-overlay .btn:hover {
@@ -1761,6 +1790,8 @@ body.cursor-hover .cursor-ring {
 #contact {
   background: var(--bg-primary);
   position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 700px;
 }
 
 #contact::before {
@@ -1795,10 +1826,12 @@ body.cursor-hover .cursor-ring {
   align-items: center;
   gap: 10px;
   box-shadow: var(--glass-shadow);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease, border-color 0.4s ease;
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  contain: layout style;
+  will-change: transform;
 }
 
 .contact-card-item::before {
@@ -1819,6 +1852,7 @@ body.cursor-hover .cursor-ring {
   transform: translateY(-4px) scale(1.01);
 }
 
+/* OPT: specific transitions for icon hover */
 .contact-card-icon {
   width: 64px;
   height: 64px;
@@ -1830,9 +1864,10 @@ body.cursor-hover .cursor-ring {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
   position: relative;
   z-index: 1;
+  will-change: transform;
 }
 
 .contact-card-item:hover .contact-card-icon {
@@ -1925,7 +1960,7 @@ body.cursor-hover .cursor-ring {
   border-radius: 60px;
   text-decoration: none;
   box-shadow: 0 8px 32px rgba(37, 211, 102, 0.35);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease;
   position: relative;
   overflow: hidden;
 }
@@ -1972,6 +2007,8 @@ body.cursor-hover .cursor-ring {
   text-align: center;
   position: relative;
   z-index: 2;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
 }
 
 .footer-logo {
@@ -2029,7 +2066,8 @@ body.cursor-hover .cursor-ring {
   justify-content: center;
   color: var(--footer-text);
   font-size: 1.1rem;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
+  will-change: transform;
 }
 
 .footer-social a:hover {
@@ -2542,7 +2580,7 @@ body.cursor-hover .cursor-ring {
   max-width: 320px;
   opacity: 0;
   transform: translateY(20px) scale(0.9);
-  transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1), transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
 }
 
@@ -2604,7 +2642,7 @@ body.cursor-hover .cursor-ring {
   cursor: pointer;
   padding: 4px;
   border-radius: 50%;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2629,8 +2667,9 @@ body.cursor-hover .cursor-ring {
   font-size: 1.5rem;
   text-decoration: none;
   box-shadow: 0 4px 20px rgba(37, 211, 102, 0.4);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), width 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.4s ease, box-shadow 0.4s ease;
   overflow: hidden;
+  will-change: transform;
 }
 
 .lets-talk-btn:hover {
@@ -2647,7 +2686,7 @@ body.cursor-hover .cursor-ring {
   white-space: nowrap;
   opacity: 0;
   width: 0;
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, width 0.3s ease, margin 0.3s ease;
 }
 
 .lets-talk-btn:hover .btn-label {

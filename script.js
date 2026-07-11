@@ -1,41 +1,88 @@
 /* ============================================================
-   script.js - Portfolio with 3D effects, particles, theme toggle,
-   custom cursor, animated counters, magnetic buttons, floating badges
+   script.js - Optimized Portfolio
+   Performance optimizations applied:
+   - rAF-throttled mouse handlers (eliminates jank from rapid mousemove)
+   - Debounced resize handlers (prevents layout thrashing)
+   - IntersectionObserver replaces scroll-heavy reveal/counter/nav logic
+   - Visibility API pauses particle canvas when tab is hidden
+   - setTimeout chains replace setInterval (avoids leaked timers)
+   - Single rAF loop per animation group (fewer frame callbacks)
+   - Cached DOM queries (avoids repeated reflows)
+   - distSq comparison avoids expensive Math.sqrt where possible
    ============================================================ */
+
+// ============================================================
+// Utility: rAF Throttle
+// Ensures mousemove handlers fire at most once per frame
+// ============================================================
+function rafThrottle(fn) {
+  var ticking = false;
+  return function () {
+    if (!ticking) {
+      ticking = true;
+      var args = arguments;
+      var ctx = this;
+      requestAnimationFrame(function () {
+        fn.apply(ctx, args);
+        ticking = false;
+      });
+    }
+  };
+}
+
+// ============================================================
+// Utility: Debounce
+// Delays execution until user stops triggering (resize, etc.)
+// ============================================================
+function debounce(fn, ms) {
+  var timer;
+  return function () {
+    clearTimeout(timer);
+    var ctx = this;
+    var args = arguments;
+    timer = setTimeout(function () {
+      fn.apply(ctx, args);
+    }, ms);
+  };
+}
 
 // ============================================================
 // 1. THEME TOGGLE (Dark / Light Mode with localStorage)
 // ============================================================
 (function initTheme() {
-  const themeToggle = document.getElementById('theme-toggle');
+  var themeToggle = document.getElementById('theme-toggle');
   if (!themeToggle) return;
-  const icon = themeToggle.querySelector('i');
-  const saved = localStorage.getItem('theme') || 'light';
+  var icon = themeToggle.querySelector('i');
+  var saved = localStorage.getItem('theme') || 'light';
 
   document.documentElement.setAttribute('data-theme', saved);
   icon.className = saved === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
 
-  themeToggle.addEventListener('click', () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
+  themeToggle.addEventListener('click', function () {
+    var current = document.documentElement.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
 
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('theme', next);
     icon.className = next === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
 
     themeToggle.style.transform = 'scale(0.8) rotate(180deg)';
-    setTimeout(() => { themeToggle.style.transform = ''; }, 300);
+    setTimeout(function () {
+      themeToggle.style.transform = '';
+    }, 300);
   });
 })();
 
 // ============================================================
 // 2. LOADING SCREEN
 // ============================================================
-window.addEventListener('load', () => {
-  const loader = document.getElementById('loader');
+window.addEventListener('load', function () {
+  var loader = document.getElementById('loader');
   if (loader) {
     loader.classList.add('fade-out');
-    setTimeout(() => { loader.style.display = 'none'; }, 600);
+    setTimeout(function () {
+      loader.style.display = 'none';
+    }, 600);
   }
 });
 
@@ -43,21 +90,21 @@ window.addEventListener('load', () => {
 // 3. TYPING ANIMATION
 // ============================================================
 (function initTyping() {
-  const phrases = [
-    "Web Developer 🔥",
-    "Full Stack Developer ⭐",
-    "MERN Full Stack Developer ✨",
-    "Frontend & Backend Developer 💻"
+  var phrases = [
+    "Web Developer \uD83D\uDD25",
+    "Full Stack Developer \u2B50",
+    "MERN Full Stack Developer \u2728",
+    "Frontend & Backend Developer \uD83D\uDCBB"
   ];
-  let phraseIndex = 0;
-  let charIndex = 0;
-  let isDeleting = false;
-  const typedEl = document.getElementById('typed');
+  var phraseIndex = 0;
+  var charIndex = 0;
+  var isDeleting = false;
+  var typedEl = document.getElementById('typed');
   if (!typedEl) return;
 
   function type() {
     if (phraseIndex >= phrases.length) phraseIndex = 0;
-    const full = phrases[phraseIndex];
+    var full = phrases[phraseIndex];
 
     if (!isDeleting) {
       typedEl.textContent = full.slice(0, charIndex + 1);
@@ -85,79 +132,98 @@ window.addEventListener('load', () => {
 })();
 
 // ============================================================
-// 4. SCROLL REVEAL
+// 4. SCROLL REVEAL (IntersectionObserver - NO scroll handler)
+// OPT: IntersectionObserver eliminates per-frame DOM scanning
+// that the old scroll listener performed on ALL .reveal elements
 // ============================================================
 (function initScrollReveal() {
-  const reveals = document.querySelectorAll('.reveal');
+  var reveals = document.querySelectorAll('.reveal');
+  if (!reveals.length) return;
 
-  function showOnScroll() {
-    const windowHeight = window.innerHeight;
-    reveals.forEach((el) => {
-      const rect = el.getBoundingClientRect();
-      if (rect.top < windowHeight - 60) {
-        el.classList.add('show');
-      }
-    });
+  // Check for IntersectionObserver support
+  if (!('IntersectionObserver' in window)) {
+    // Fallback: show everything immediately
+    reveals.forEach(function (el) { el.classList.add('show'); });
+    return;
   }
 
-  window.addEventListener('scroll', showOnScroll, { passive: true });
-  window.addEventListener('load', showOnScroll);
-  window.addEventListener('resize', showOnScroll);
+  var observer = new IntersectionObserver(function (entries) {
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isIntersecting) {
+        entries[i].target.classList.add('show');
+        observer.unobserve(entries[i].target); // OPT: stop observing once revealed
+      }
+    }
+  }, {
+    rootMargin: '0px 0px -60px 0px', // trigger 60px before element enters viewport
+    threshold: 0
+  });
+
+  for (var i = 0; i < reveals.length; i++) {
+    observer.observe(reveals[i]);
+  }
 })();
 
 // ============================================================
 // 5. SMOOTH SCROLL
 // ============================================================
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener('click', (e) => {
-    const targetId = anchor.getAttribute('href');
-    if (targetId === '#') return;
+(function initSmoothScroll() {
+  var anchors = document.querySelectorAll('a[href^="#"]');
 
-    const target = document.querySelector(targetId);
-    if (target) {
-      e.preventDefault();
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  for (var i = 0; i < anchors.length; i++) {
+    anchors[i].addEventListener('click', function (e) {
+      var targetId = this.getAttribute('href');
+      if (targetId === '#') return;
 
-      const navbarCollapse = document.getElementById('navbarNav');
-      if (navbarCollapse && navbarCollapse.classList.contains('show') && typeof bootstrap !== 'undefined') {
-        const bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
-        if (bsCollapse) bsCollapse.hide();
+      var target = document.querySelector(targetId);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        var navbarCollapse = document.getElementById('navbarNav');
+        if (navbarCollapse && navbarCollapse.classList.contains('show') && typeof bootstrap !== 'undefined') {
+          var bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+          if (bsCollapse) bsCollapse.hide();
+        }
       }
-    }
-  });
-});
+    });
+  }
+})();
 
 // ============================================================
-// 6. NAVBAR SCROLL EFFECT
+// 6. NAVBAR SCROLL EFFECT (rAF-throttled)
+// OPT: rAF throttle prevents layout thrashing from rapid scroll events
 // ============================================================
 (function initNavbarScroll() {
-  const nav = document.querySelector('.navbar');
+  var nav = document.querySelector('.navbar');
+  if (!nav) return;
 
-  window.addEventListener('scroll', () => {
+  window.addEventListener('scroll', rafThrottle(function () {
     if (window.scrollY > 50) {
       nav.classList.add('nav-scrolled');
     } else {
       nav.classList.remove('nav-scrolled');
     }
-  }, { passive: true });
+  }), { passive: true });
 })();
 
 // ============================================================
 // 7. FORM HANDLER
 // ============================================================
 (function initForm() {
-  const form = document.querySelector('#contact form');
+  var form = document.querySelector('#contact form');
   if (!form) return;
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', function (e) {
     e.preventDefault();
-    const btn = form.querySelector('button[type="submit"]');
-    const originalText = btn.innerHTML;
+    var btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+    var originalText = btn.innerHTML;
 
     btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Message Sent!';
     btn.disabled = true;
 
-    setTimeout(() => {
+    setTimeout(function () {
       btn.innerHTML = originalText;
       btn.disabled = false;
       form.reset();
@@ -166,105 +232,126 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
 })();
 
 // ============================================================
-// 8. ACTIVE NAV LINK ON SCROLL
+// 8. ACTIVE NAV LINK ON SCROLL (rAF-throttled)
+// OPT: Cached navLinks and sections to avoid repeated DOM queries
 // ============================================================
 (function initActiveNav() {
-  const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('.nav-link');
+  var sections = document.querySelectorAll('section[id]');
+  var navLinks = document.querySelectorAll('.nav-link');
+  if (!sections.length || !navLinks.length) return;
 
-  function updateActiveLink() {
-    let current = '';
-    const scrollY = window.scrollY + 100;
+  // Cache section offsets to avoid reflow on every scroll
+  var sectionData = [];
 
-    sections.forEach((section) => {
-      const top = section.offsetTop;
-      const height = section.offsetHeight;
-      if (scrollY >= top && scrollY < top + height) {
-        current = section.getAttribute('id');
-      }
-    });
-
-    navLinks.forEach((link) => {
-      link.classList.remove('active');
-      if (link.getAttribute('href') === '#' + current) {
-        link.classList.add('active');
-      }
-    });
+  function cacheSectionData() {
+    sectionData = [];
+    for (var i = 0; i < sections.length; i++) {
+      sectionData.push({
+        id: sections[i].getAttribute('id'),
+        top: sections[i].offsetTop,
+        height: sections[i].offsetHeight
+      });
+    }
   }
 
-  window.addEventListener('scroll', updateActiveLink, { passive: true });
-  window.addEventListener('load', updateActiveLink);
+  cacheSectionData();
+  window.addEventListener('resize', debounce(cacheSectionData, 200));
+
+  function updateActiveLink() {
+    var scrollY = window.scrollY + 100;
+    var current = '';
+
+    for (var i = 0; i < sectionData.length; i++) {
+      if (scrollY >= sectionData[i].top && scrollY < sectionData[i].top + sectionData[i].height) {
+        current = sectionData[i].id;
+      }
+    }
+
+    for (var i = 0; i < navLinks.length; i++) {
+      var isActive = navLinks[i].getAttribute('href') === '#' + current;
+      // OPT: only modify DOM if class actually changes (avoids forced reflow)
+      if (isActive && !navLinks[i].classList.contains('active')) {
+        navLinks[i].classList.add('active');
+      } else if (!isActive && navLinks[i].classList.contains('active')) {
+        navLinks[i].classList.remove('active');
+      }
+    }
+  }
+
+  window.addEventListener('scroll', rafThrottle(updateActiveLink), { passive: true });
+  updateActiveLink();
 })();
 
 // ============================================================
-// 9. 3D TILT EFFECT (VanillaTilt-style implementation)
+// 9. 3D TILT EFFECT (rAF-throttled mousemove)
+// OPT: Throttled with rAF to prevent jank on rapid mouse movement
 // ============================================================
 (function init3DTilt() {
-  const cards = document.querySelectorAll('.tilt-card');
+  var cards = document.querySelectorAll('.tilt-card');
+  if (!cards.length) return;
 
-  cards.forEach((card) => {
-    const scale = parseFloat(card.getAttribute('data-tilt-scale')) || 1.02;
-    const glare = card.hasAttribute('data-tilt-glare');
+  for (var c = 0; c < cards.length; c++) {
+    (function (card) {
+      var scale = parseFloat(card.getAttribute('data-tilt-scale')) || 1.02;
+      var hasGlare = card.hasAttribute('data-tilt-glare');
+      var glareEl = null;
 
-    if (glare) {
-      const glareEl = document.createElement('div');
-      glareEl.className = 'tilt-glare';
-      glareEl.style.cssText =
-        'position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent 50%,rgba(0,0,0,0.1));opacity:0;transition:opacity 0.4s ease;pointer-events:none;z-index:5;';
-      card.style.position = 'relative';
-      card.appendChild(glareEl);
-    }
+      if (hasGlare) {
+        glareEl = document.createElement('div');
+        glareEl.className = 'tilt-glare';
+        glareEl.style.cssText =
+          'position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent 50%,rgba(0,0,0,0.1));opacity:0;transition:opacity 0.4s ease;pointer-events:none;z-index:5;';
+        card.style.position = 'relative';
+        card.appendChild(glareEl);
+      }
 
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
+      card.addEventListener('mousemove', rafThrottle(function (e) {
+        var rect = card.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        var y = e.clientY - rect.top;
+        var centerX = rect.width / 2;
+        var centerY = rect.height / 2;
 
-      const rotateX = ((y - centerY) / centerY) * -8;
-      const rotateY = ((x - centerX) / centerX) * 8;
+        var rotateX = ((y - centerY) / centerY) * -8;
+        var rotateY = ((x - centerX) / centerX) * 8;
 
-      card.style.transform =
-        `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(${scale}, ${scale}, ${scale})`;
+        card.style.transform =
+          'perspective(1000px) rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) scale3d(' + scale + ',' + scale + ',' + scale + ')';
 
-      if (glare) {
-        const glareEl = card.querySelector('.tilt-glare');
-        if (glareEl) {
+        if (hasGlare && glareEl) {
           glareEl.style.opacity = '1';
-          const glareX = (x / rect.width) * 100;
-          const glareY = (y / rect.height) * 100;
+          var glareX = (x / rect.width) * 100;
+          var glareY = (y / rect.height) * 100;
           glareEl.style.background =
-            `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.12) 0%, transparent 60%)`;
+            'radial-gradient(circle at ' + glareX + '% ' + glareY + '%, rgba(255,255,255,0.12) 0%, transparent 60%)';
         }
-      }
-    });
+      }));
 
-    card.addEventListener('mouseleave', () => {
-      card.style.transform =
-        'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
+      card.addEventListener('mouseleave', function () {
+        card.style.transform =
+          'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
 
-      if (glare) {
-        const glareEl = card.querySelector('.tilt-glare');
-        if (glareEl) glareEl.style.opacity = '0';
-      }
-    });
-  });
+        if (hasGlare && glareEl) glareEl.style.opacity = '0';
+      });
+    })(cards[c]);
+  }
 })();
 
 // ============================================================
 // 10. PARTICLE NETWORK ANIMATION
+// OPT: Debounced resize, rAF-throttled mouse, visibility API pause,
+// distSq avoids Math.sqrt for distance comparisons
 // ============================================================
 (function initParticles() {
-  const canvas = document.getElementById('particle-canvas');
+  var canvas = document.getElementById('particle-canvas');
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  let particles = [];
-  let mouseX = -1000;
-  let mouseY = -1000;
-  let animId;
-  let isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var ctx = canvas.getContext('2d');
+  var particles = [];
+  var mouseX = -1000;
+  var mouseY = -1000;
+  var animId;
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
   function resize() {
     canvas.width = window.innerWidth;
@@ -273,7 +360,7 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
 
   function createParticles(count) {
     particles = [];
-    for (let i = 0; i < count; i++) {
+    for (var i = 0; i < count; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
@@ -285,14 +372,18 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     }
   }
 
+  var MAX_DIST_SQ = 14400; // 120^2 - avoids sqrt for line distance check
+  var MOUSE_DIST_SQ = 22500; // 150^2 - avoids sqrt for mouse distance check
+
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const particleColor = isDark ? '180, 180, 220' : '99, 102, 241';
-    const lineColor = isDark ? '180, 180, 220' : '99, 102, 241';
+    var particleColor = isDark ? '180, 180, 220' : '99, 102, 241';
+    var lineColor = isDark ? '180, 180, 220' : '99, 102, 241';
+    var len = particles.length;
 
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i];
+    for (var i = 0; i < len; i++) {
+      var p = particles[i];
 
       p.x += p.vx;
       p.y += p.vy;
@@ -304,34 +395,37 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(${particleColor}, ${p.alpha})`;
+      ctx.fillStyle = 'rgba(' + particleColor + ',' + p.alpha + ')';
       ctx.fill();
 
-      for (let j = i + 1; j < particles.length; j++) {
-        const p2 = particles[j];
-        const dx = p.x - p2.x;
-        const dy = p.y - p2.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxDist = 120;
+      // Draw connection lines between nearby particles
+      for (var j = i + 1; j < len; j++) {
+        var p2 = particles[j];
+        var dx = p.x - p2.x;
+        var dy = p.y - p2.y;
+        var distSq = dx * dx + dy * dy;
 
-        if (dist < maxDist) {
+        if (distSq < MAX_DIST_SQ) {
+          var dist = Math.sqrt(distSq);
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p2.x, p2.y);
-          ctx.strokeStyle = `rgba(${lineColor}, ${(1 - dist / maxDist) * 0.15})`;
+          ctx.strokeStyle = 'rgba(' + lineColor + ',' + ((1 - dist / 120) * 0.15) + ')';
           ctx.lineWidth = 0.5;
           ctx.stroke();
         }
       }
 
-      const dxm = p.x - mouseX;
-      const dym = p.y - mouseY;
-      const distMouse = Math.sqrt(dxm * dxm + dym * dym);
-      if (distMouse < 150) {
+      // Draw line to mouse cursor
+      var dxm = p.x - mouseX;
+      var dym = p.y - mouseY;
+      var distMouseSq = dxm * dxm + dym * dym;
+      if (distMouseSq < MOUSE_DIST_SQ) {
+        var distMouse = Math.sqrt(distMouseSq);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
         ctx.lineTo(mouseX, mouseY);
-        ctx.strokeStyle = `rgba(${lineColor}, ${(1 - distMouse / 150) * 0.2})`;
+        ctx.strokeStyle = 'rgba(' + lineColor + ',' + ((1 - distMouse / 150) * 0.2) + ')';
         ctx.lineWidth = 0.5;
         ctx.stroke();
       }
@@ -346,127 +440,148 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     draw();
   }
 
-  window.addEventListener('resize', () => {
+  // OPT: Debounced resize prevents recreating particles on every resize event
+  window.addEventListener('resize', debounce(function () {
     resize();
     createParticles(Math.min(Math.floor((canvas.width * canvas.height) / 12000), 80));
-  });
+  }, 250));
 
-  document.addEventListener('mousemove', (e) => {
+  // OPT: rAF-throttled mousemove prevents jank
+  document.addEventListener('mousemove', rafThrottle(function (e) {
     mouseX = e.clientX;
     mouseY = e.clientY;
-  });
+  }));
 
-  document.addEventListener('touchmove', (e) => {
+  document.addEventListener('touchmove', function (e) {
     mouseX = e.touches[0].clientX;
     mouseY = e.touches[0].clientY;
   }, { passive: true });
 
-  const themeObserver = new MutationObserver(() => {
+  // Theme-aware particle colors
+  var themeObserver = new MutationObserver(function () {
     isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   });
-  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme']
+  });
+
+  // OPT: Pause animation when tab is hidden (saves CPU/GPU)
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      cancelAnimationFrame(animId);
+    } else {
+      draw();
+    }
+  });
 
   init();
 })();
 
 // ============================================================
-// 11. HERO 3D PARALLAX (mouse-follow depth)
+// 11. HERO 3D PARALLAX (rAF-throttled mousemove)
+// OPT: Throttled mousemove prevents jank; cached DOM queries
 // ============================================================
 (function initHeroParallax() {
-  const hero = document.querySelector('.hero');
+  var hero = document.querySelector('.hero');
   if (!hero) return;
 
-  const orbs = hero.querySelectorAll('.hero-orb');
-  const floatingBadges = hero.querySelectorAll('.hero-floating-badge');
-  const imageWrapper = hero.querySelector('.hero-image-wrapper');
+  var orbs = hero.querySelectorAll('.hero-orb');
+  var floatingBadges = hero.querySelectorAll('.hero-floating-badge');
+  var imageWrapper = hero.querySelector('.hero-image-wrapper');
+  var inner = imageWrapper ? imageWrapper.querySelector('.hero-image-inner') : null;
 
-  hero.addEventListener('mousemove', (e) => {
-    const rect = hero.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
+  hero.addEventListener('mousemove', rafThrottle(function (e) {
+    var rect = hero.getBoundingClientRect();
+    var x = (e.clientX - rect.left) / rect.width - 0.5;
+    var y = (e.clientY - rect.top) / rect.height - 0.5;
 
-    orbs.forEach((orb, i) => {
-      const depth = (i + 1) * 1.5;
-      orb.style.transform =
-        `translateX(${x * depth * 2}px) translateY(${y * depth * 2}px)`;
-    });
+    for (var i = 0; i < orbs.length; i++) {
+      var depth = (i + 1) * 1.5;
+      orbs[i].style.transform =
+        'translateX(' + (x * depth * 2) + 'px) translateY(' + (y * depth * 2) + 'px)';
+    }
 
     // Move floating badges with parallax
-    floatingBadges.forEach((badge, i) => {
-      const depth = (i + 1) * 0.8;
-      badge.style.transform =
-        `translateY(${Math.sin(Date.now() / 1000 + i) * 10}px) translateX(${x * depth * 3}px)`;
-    });
+    var now = Date.now() / 1000;
+    for (var i = 0; i < floatingBadges.length; i++) {
+      var depth = (i + 1) * 0.8;
+      floatingBadges[i].style.transform =
+        'translateY(' + (Math.sin(now + i) * 10) + 'px) translateX(' + (x * depth * 3) + 'px)';
+    }
 
     // Subtle image wrapper tilt
-    if (imageWrapper) {
-      const imgRotateX = y * -5;
-      const imgRotateY = x * 5;
-      const inner = imageWrapper.querySelector('.hero-image-inner');
-      if (inner) {
-        inner.style.transform = `perspective(800px) rotateX(${imgRotateX}deg) rotateY(${imgRotateY}deg) scale(1.02)`;
-      }
+    if (inner) {
+      inner.style.transform = 'perspective(800px) rotateX(' + (y * -5) + 'deg) rotateY(' + (x * 5) + 'deg) scale(1.02)';
     }
-  });
+  }));
 
-  hero.addEventListener('mouseleave', () => {
-    orbs.forEach((orb, i) => {
-      orb.style.transition = 'transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)';
-      orb.style.transform = `translateX(0) translateY(0)`;
-      setTimeout(() => { orb.style.transition = ''; }, 800);
-    });
-
-    if (imageWrapper) {
-      const inner = imageWrapper.querySelector('.hero-image-inner');
-      if (inner) {
-        inner.style.transition = 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
-        inner.style.transform = '';
-        setTimeout(() => { inner.style.transition = ''; }, 600);
-      }
+  hero.addEventListener('mouseleave', function () {
+    for (var i = 0; i < orbs.length; i++) {
+      orbs[i].style.transition = 'transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)';
+      orbs[i].style.transform = 'translateX(0) translateY(0)';
     }
+
+    if (inner) {
+      inner.style.transition = 'transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+      inner.style.transform = '';
+    }
+
+    // Clean up transitions after animation completes
+    setTimeout(function () {
+      for (var i = 0; i < orbs.length; i++) {
+        orbs[i].style.transition = '';
+      }
+      if (inner) inner.style.transition = '';
+    }, 800);
   });
 })();
 
 // ============================================================
-// 12. PROJECT CARD PERSPECTIVE ENHANCEMENT
+// 12. PROJECT CARD PERSPECTIVE (rAF-throttled)
 // ============================================================
 (function initProjectCard3D() {
-  const projectCards = document.querySelectorAll('.project-card');
+  var projectCards = document.querySelectorAll('.project-card');
+  if (!projectCards.length) return;
 
-  projectCards.forEach((card) => {
-    const img = card.querySelector('.project-card-img-wrapper img');
-    const overlay = card.querySelector('.project-card-overlay');
+  for (var c = 0; c < projectCards.length; c++) {
+    (function (card) {
+      var img = card.querySelector('.project-card-img-wrapper img');
+      var overlay = card.querySelector('.project-card-overlay');
 
-    card.addEventListener('mousemove', (e) => {
-      const rect = card.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      card.addEventListener('mousemove', rafThrottle(function (e) {
+        var rect = card.getBoundingClientRect();
+        var x = (e.clientX - rect.left) / rect.width - 0.5;
+        var y = (e.clientY - rect.top) / rect.height - 0.5;
 
-      if (img) {
-        img.style.transform = `scale(1.12) translateX(${x * 8}px) translateY(${y * 8}px)`;
-      }
-      if (overlay) {
-        overlay.style.background =
-          `linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,${0.3 + Math.abs(x) * 0.3}) 100%)`;
-      }
-    });
+        if (img) {
+          img.style.transform = 'scale(1.12) translateX(' + (x * 8) + 'px) translateY(' + (y * 8) + 'px)';
+        }
+        if (overlay) {
+          overlay.style.background =
+            'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,' + (0.3 + Math.abs(x) * 0.3) + ') 100%)';
+        }
+      }));
 
-    card.addEventListener('mouseleave', () => {
-      if (img) img.style.transform = '';
-      if (overlay) overlay.style.background = '';
-    });
-  });
+      card.addEventListener('mouseleave', function () {
+        if (img) img.style.transform = '';
+        if (overlay) overlay.style.background = '';
+      });
+    })(projectCards[c]);
+  }
 })();
 
 // ============================================================
-// 13. CUSTOM CURSOR
+// 13. CUSTOM CURSOR (already uses requestAnimationFrame)
+// OPT: Only runs on non-touch devices; hidden cursor element
+// removed from DOM flow with pointer-events:none
 // ============================================================
 (function initCustomCursor() {
-  const cursor = document.getElementById('custom-cursor');
+  var cursor = document.getElementById('custom-cursor');
   if (!cursor) return;
 
-  const dot = cursor.querySelector('.cursor-dot');
-  const ring = cursor.querySelector('.cursor-ring');
+  var dot = cursor.querySelector('.cursor-dot');
+  var ring = cursor.querySelector('.cursor-ring');
   if (!dot || !ring) return;
 
   // Skip on touch devices
@@ -475,23 +590,23 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     return;
   }
 
-  let mouseX = 0, mouseY = 0;
-  let dotX = 0, dotY = 0;
-  let ringX = 0, ringY = 0;
+  var mouseX = 0, mouseY = 0;
+  var dotX = 0, dotY = 0;
+  var ringX = 0, ringY = 0;
 
-  document.addEventListener('mousemove', (e) => {
+  document.addEventListener('mousemove', function (e) {
     mouseX = e.clientX;
     mouseY = e.clientY;
   });
 
   function animate() {
-    // Dot follows immediately
+    // Dot follows immediately (lerp factor 0.25)
     dotX += (mouseX - dotX) * 0.25;
     dotY += (mouseY - dotY) * 0.25;
     dot.style.left = dotX + 'px';
     dot.style.top = dotY + 'px';
 
-    // Ring follows with lag
+    // Ring follows with lag (lerp factor 0.12)
     ringX += (mouseX - ringX) * 0.12;
     ringY += (mouseY - ringY) * 0.12;
     ring.style.left = ringX + 'px';
@@ -503,180 +618,207 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
   animate();
 
   // Hover state on interactive elements
-  const hoverTargets = document.querySelectorAll('a, button, .tilt-card, .skill-card, .service-card, .project-card, .contact-card-item');
+  var hoverTargets = document.querySelectorAll('a, button, .tilt-card, .skill-card, .service-card, .project-card, .contact-card-item');
 
-  hoverTargets.forEach((el) => {
-    el.addEventListener('mouseenter', () => document.body.classList.add('cursor-hover'));
-    el.addEventListener('mouseleave', () => document.body.classList.remove('cursor-hover'));
-  });
-})();
-
-// ============================================================
-// 14. MAGNETIC BUTTON EFFECT
-// ============================================================
-(function initMagneticButtons() {
-  const btns = document.querySelectorAll('.magnetic-btn');
-
-  btns.forEach((btn) => {
-    btn.addEventListener('mousemove', (e) => {
-      const rect = btn.getBoundingClientRect();
-      const x = e.clientX - rect.left - rect.width / 2;
-      const y = e.clientY - rect.top - rect.height / 2;
-
-      btn.style.transform = `translate(${x * 0.15}px, ${y * 0.15}px) scale(1.03)`;
+  for (var i = 0; i < hoverTargets.length; i++) {
+    hoverTargets[i].addEventListener('mouseenter', function () {
+      document.body.classList.add('cursor-hover');
     });
-
-    btn.addEventListener('mouseleave', () => {
-      btn.style.transform = '';
-      btn.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
-      setTimeout(() => { btn.style.transition = ''; }, 400);
-    });
-  });
-})();
-
-// ============================================================
-// 15. ANIMATED COUNTERS (About Stats)
-// ============================================================
-(function initAnimatedCounters() {
-  const counters = document.querySelectorAll('.stat-number[data-count]');
-  if (!counters.length) return;
-
-  let counted = false;
-
-  function animateCounters() {
-    if (counted) return;
-
-    const firstCounter = counters[0];
-    if (!firstCounter) return;
-
-    const rect = firstCounter.getBoundingClientRect();
-    if (rect.top > window.innerHeight || rect.bottom < 0) return;
-
-    counted = true;
-
-    counters.forEach((counter) => {
-      const target = parseInt(counter.getAttribute('data-count'), 10);
-      const duration = 2000;
-      const startTime = performance.now();
-
-      function update(currentTime) {
-        const elapsed = currentTime - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-
-        // Ease out cubic
-        const eased = 1 - Math.pow(1 - progress, 3);
-        const current = Math.floor(eased * target);
-
-        counter.textContent = current;
-
-        if (progress < 1) {
-          requestAnimationFrame(update);
-        } else {
-          counter.textContent = target;
-        }
-      }
-
-      requestAnimationFrame(update);
+    hoverTargets[i].addEventListener('mouseleave', function () {
+      document.body.classList.remove('cursor-hover');
     });
   }
-
-  window.addEventListener('scroll', animateCounters, { passive: true });
-  window.addEventListener('load', animateCounters);
 })();
 
 // ============================================================
-// 16. SCENE 3D DEPTH PARALLAX (global mouse)
+// 14. MAGNETIC BUTTON EFFECT (rAF-throttled)
+// ============================================================
+(function initMagneticButtons() {
+  var btns = document.querySelectorAll('.magnetic-btn');
+  if (!btns.length) return;
+
+  for (var b = 0; b < btns.length; b++) {
+    (function (btn) {
+      btn.addEventListener('mousemove', rafThrottle(function (e) {
+        var rect = btn.getBoundingClientRect();
+        var x = e.clientX - rect.left - rect.width / 2;
+        var y = e.clientY - rect.top - rect.height / 2;
+
+        btn.style.transform = 'translate(' + (x * 0.15) + 'px, ' + (y * 0.15) + 'px) scale(1.03)';
+      }));
+
+      btn.addEventListener('mouseleave', function () {
+        btn.style.transform = '';
+        btn.style.transition = 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+        setTimeout(function () {
+          btn.style.transition = '';
+        }, 400);
+      });
+    })(btns[b]);
+  }
+})();
+
+// ============================================================
+// 15. ANIMATED COUNTERS (IntersectionObserver - NO scroll handler)
+// OPT: IntersectionObserver eliminates per-frame scroll checking
+// ============================================================
+(function initAnimatedCounters() {
+  var counters = document.querySelectorAll('.stat-number[data-count]');
+  if (!counters.length) return;
+
+  var counted = false;
+  var statsSection = counters[0].closest('.about-stats');
+  if (!statsSection) return;
+
+  if (!('IntersectionObserver' in window)) {
+    // Fallback: show final values immediately
+    counters.forEach(function (counter) {
+      counter.textContent = counter.getAttribute('data-count');
+    });
+    return;
+  }
+
+  var observer = new IntersectionObserver(function (entries) {
+    if (entries[0].isIntersecting && !counted) {
+      counted = true;
+      observer.disconnect();
+
+      for (var i = 0; i < counters.length; i++) {
+        (function (counter) {
+          var target = parseInt(counter.getAttribute('data-count'), 10);
+          var duration = 2000;
+          var startTime = performance.now();
+
+          function update(currentTime) {
+            var elapsed = currentTime - startTime;
+            var progress = Math.min(elapsed / duration, 1);
+            // Ease out cubic
+            var eased = 1 - Math.pow(1 - progress, 3);
+            counter.textContent = Math.floor(eased * target);
+
+            if (progress < 1) {
+              requestAnimationFrame(update);
+            } else {
+              counter.textContent = target;
+            }
+          }
+
+          requestAnimationFrame(update);
+        })(counters[i]);
+      }
+    }
+  }, { threshold: 0.5 });
+
+  observer.observe(statsSection);
+})();
+
+// ============================================================
+// 16. SCENE 3D DEPTH PARALLAX (rAF-throttled global mouse)
+// OPT: Throttled mousemove, cached DOM elements
 // ============================================================
 (function initScene3D() {
-  const scene = document.getElementById('scene-3d');
+  var scene = document.getElementById('scene-3d');
   if (!scene) return;
 
-  document.addEventListener('mousemove', (e) => {
-    const x = (e.clientX / window.innerWidth - 0.5) * 2;
-    const y = (e.clientY / window.innerHeight - 0.5) * 2;
+  var orbs = scene.querySelectorAll('.scene-orb');
+  var rings = scene.querySelectorAll('.scene-ring');
 
-    const orbs = scene.querySelectorAll('.scene-orb');
-    orbs.forEach((orb, i) => {
-      const depth = (i + 1) * 3;
-      orb.style.transform = `translate(${x * depth}px, ${y * depth}px)`;
-    });
+  document.addEventListener('mousemove', rafThrottle(function (e) {
+    var x = (e.clientX / window.innerWidth - 0.5) * 2;
+    var y = (e.clientY / window.innerHeight - 0.5) * 2;
 
-    // Rings only translate with mouse; CSS handles rotation via JS in initSceneRings
-    const rings = scene.querySelectorAll('.scene-ring');
-    rings.forEach((ring, i) => {
-      const depth = (i + 1) * 2;
-      ring.style.setProperty('--mx', `${x * depth}px`);
-      ring.style.setProperty('--my', `${y * depth}px`);
-    });
-  });
+    for (var i = 0; i < orbs.length; i++) {
+      var depth = (i + 1) * 3;
+      orbs[i].style.transform = 'translate(' + (x * depth) + 'px, ' + (y * depth) + 'px)';
+    }
+
+    for (var i = 0; i < rings.length; i++) {
+      var depth = (i + 1) * 2;
+      rings[i].style.setProperty('--mx', (x * depth) + 'px');
+      rings[i].style.setProperty('--my', (y * depth) + 'px');
+    }
+  }));
 })();
 
 // ============================================================
 // 17. LET'S TALK FLOATING NOTIFICATION
+// OPT: Replaced setInterval with setTimeout chains to avoid
+// leaked/repeated timers. Uses closure-based scheduling.
 // ============================================================
 (function initLetsTalk() {
-  const float = document.getElementById('lets-talk-float');
-  const bubble = document.getElementById('lets-talk-bubble');
-  const closeBtn = document.getElementById('bubble-close');
-  const talkBtn = float ? float.querySelector('.lets-talk-btn') : null;
+  var float = document.getElementById('lets-talk-float');
+  var bubble = document.getElementById('lets-talk-bubble');
+  var closeBtn = document.getElementById('bubble-close');
+  var talkBtn = float ? float.querySelector('.lets-talk-btn') : null;
   if (!float || !bubble || !closeBtn) return;
+
+  var hideTimer = null;
+  var showTimer = null;
+
+  function scheduleShow(delay) {
+    clearTimeout(showTimer);
+    showTimer = setTimeout(showBubble, delay);
+  }
+
+  function showBubble() {
+    bubble.classList.add('show');
+    // Auto-hide after 8 seconds
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      bubble.classList.remove('show');
+      // Re-show after 30 seconds
+      scheduleShow(30000);
+    }, 8000);
+  }
 
   // Let's Talk button scrolls to contact section
   if (talkBtn) {
-    talkBtn.addEventListener('click', (e) => {
+    talkBtn.addEventListener('click', function (e) {
       e.preventDefault();
-      const contactSection = document.getElementById('contact');
+      var contactSection = document.getElementById('contact');
       if (contactSection) {
         contactSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       bubble.classList.remove('show');
+      clearTimeout(hideTimer);
+      scheduleShow(30000); // Re-show after 30 seconds
     });
   }
 
-  // Show bubble after 3 seconds
-  setTimeout(() => {
-    bubble.classList.add('show');
-  }, 3000);
-
-  // Hide bubble after 10 seconds if not closed
-  let bubbleTimeout = setTimeout(() => {
-    bubble.classList.remove('show');
-  }, 13000);
-
   // Close button
-  closeBtn.addEventListener('click', () => {
+  closeBtn.addEventListener('click', function () {
     bubble.classList.remove('show');
-    clearTimeout(bubbleTimeout);
+    clearTimeout(hideTimer);
+    scheduleShow(30000); // Re-show after 30 seconds
   });
 
-  // Re-show bubble every 30 seconds if closed
-  setInterval(() => {
-    if (!bubble.classList.contains('show')) {
-      bubble.classList.add('show');
-      setTimeout(() => {
-        bubble.classList.remove('show');
-      }, 8000);
-    }
-  }, 30000);
+  // Initial show after 3 seconds
+  scheduleShow(3000);
 })();
 
 // ============================================================
 // 18. FLOATING BADGES CONTINUOUS ANIMATION
+// OPT: Single rAF loop for all badges instead of one per badge
 // ============================================================
 (function initFloatingBadges() {
-  const badges = document.querySelectorAll('.hero-floating-badge');
+  var badges = document.querySelectorAll('.hero-floating-badge');
+  if (!badges.length) return;
 
-  badges.forEach((badge, i) => {
-    let offset = i * 1.2;
+  // Use a single rAF loop for ALL badges (1 callback vs N)
+  var offsets = [];
+  for (var i = 0; i < badges.length; i++) {
+    offsets.push(i * 1.2);
+  }
 
-    function animate() {
-      offset += 0.018;
-      const y = Math.sin(offset) * 12;
-      const rotate = Math.sin(offset * 0.7) * 5;
-      badge.style.transform = `translateY(${y}px) rotate(${rotate}deg)`;
-      requestAnimationFrame(animate);
+  function animate() {
+    for (var i = 0; i < badges.length; i++) {
+      offsets[i] += 0.018;
+      var y = Math.sin(offsets[i]) * 12;
+      var rotate = Math.sin(offsets[i] * 0.7) * 5;
+      badges[i].style.transform = 'translateY(' + y + 'px) rotate(' + rotate + 'deg)';
     }
+    requestAnimationFrame(animate);
+  }
 
-    animate();
-  });
+  animate();
 })();
